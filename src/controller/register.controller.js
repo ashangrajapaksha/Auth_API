@@ -7,25 +7,19 @@ const OTP_EXPIRATION_TIME = 60 * 1000;
 
 const generateOTP = async (req, res) => {
   const email = req.body.email;
-  console.log(email);
   try {
     if (!email) {
       return res.status(400).json({ message: "Email is required" });
     }
-
     const otp = generateNumericOTP(6);
-
-    console.log(otp);
     const expirationTime = Date.now() + OTP_EXPIRATION_TIME;
-
     const updateData = {
       otp,
       otpExpiration: expirationTime,
     };
-
-    // await User.updateOne({ email }, updateData, { upsert: true });
-    await sendEmail(email, "Your OTP Code", `Your OTP is ${otp}`);
-
+    await User.updateOne({ email }, updateData, { upsert: true });
+    // await sendEmail(email, "Your OTP Code", `Your OTP is ${otp}`);
+    console.log(updateData);
     res.status(200).json({ message: "OTP sent successfully" });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
@@ -41,4 +35,51 @@ const generateNumericOTP = (length) => {
   return otp;
 };
 
-module.exports = { generateOTP };
+const verifyOTP = async (req, res) => {
+  const { email, otp } = req.body;
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      res.status(400).json({ message: "User not found" });
+      return;
+    }
+    if (user.otp !== otp || user.otpExpiration < new Date()) {
+      res.status(400).json({ message: "Invalid or expired OTP" });
+      return;
+    }
+
+    await User.updateOne(
+      { _id: user._id },
+      { otp: null, otpExpiration: null, isEmailVerified: true }
+    );
+
+    res.status(200).json({ message: "OTP verified successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const register = async (req, res) => {
+  const { firstName, lastName, email, password } = req.body;
+  try {
+    const user = await User.findOne({ email });
+
+    if (!user || !user.isEmailVerified) {
+      res.status(400).json({ message: "Email not verified" });
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await User.updateOne(
+      { email },
+      { firstName: firstName, lastName: lastName, password: hashedPassword }
+    );
+
+    res.status(200).json({ message: "User registered successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+module.exports = { generateOTP, verifyOTP, register };
