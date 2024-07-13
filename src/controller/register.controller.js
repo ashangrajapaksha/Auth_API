@@ -5,6 +5,10 @@ const bcrypt = require("bcrypt");
 
 const OTP_EXPIRATION_TIME = 60 * 1000;
 
+/**
+ * Function to generate a random OTP
+ * @returns {string} - A random OTP of specified length
+ */
 const generateOTP = async (req, res) => {
   const email = req.body.email;
   try {
@@ -35,6 +39,10 @@ const generateNumericOTP = (length) => {
   return otp;
 };
 
+/**
+ * Function to verify the OTP provided by the user
+ * @returns {boolean} - Returns true if the OTP is verified successfully, otherwise false
+ */
 const verifyOTP = async (req, res) => {
   const { email, otp } = req.body;
   try {
@@ -59,6 +67,11 @@ const verifyOTP = async (req, res) => {
   }
 };
 
+/**
+ * Register after verify Email
+ * @returns {string}
+ */
+
 const register = async (req, res) => {
   const { firstName, lastName, email, password } = req.body;
   try {
@@ -82,6 +95,10 @@ const register = async (req, res) => {
   }
 };
 
+/**
+ * Login method
+ * @returns {string}
+ */
 const login = async (req, res) => {
   const { email, password } = req.body;
   try {
