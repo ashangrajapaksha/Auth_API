@@ -6,27 +6,69 @@ const bcrypt = require("bcrypt");
 const OTP_EXPIRATION_TIME = 60 * 1000;
 
 /**
- * Function to generate a random OTP
- * @returns {string} - A random OTP of specified length
+ * Register after verifying Email
+ * @returns {string}
  */
-const generateOTP = async (req, res) => {
-  const email = req.body.email;
+const register = async (req, res) => {
+  const { firstName, lastName, email, password } = req.body;
+  console.log(req.body);
+  try {
+    const user = await User.findOne({ email });
+
+    if (user) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = new User({
+      firstName,
+      lastName,
+      email,
+      password: hashedPassword,
+    });
+
+    await newUser.save();
+
+    const otpResponse = await generateOTP(email);
+
+    if (otpResponse.error) {
+      return res.status(500).json({ message: "Error generating OTP" });
+    }
+
+    res
+      .status(200)
+      .json({ message: "User registered successfully. OTP sent to email." });
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/**
+ * Function to generate a random OTP
+ * @param {string} email - Email of the user
+ * @returns {object} - Response message
+ */
+const generateOTP = async (email) => {
   try {
     if (!email) {
-      return res.status(400).json({ message: "Email is required" });
+      return { error: true, message: "Email is required" };
     }
+
     const otp = generateNumericOTP(6);
     const expirationTime = Date.now() + OTP_EXPIRATION_TIME;
     const updateData = {
       otp,
       otpExpiration: expirationTime,
     };
+
     await User.updateOne({ email }, updateData, { upsert: true });
+
     // await sendEmail(email, "Your OTP Code", `Your OTP is ${otp}`);
-    console.log(updateData);
-    res.status(200).json({ message: "OTP sent successfully" });
+
+    return { error: false, message: "OTP sent successfully" };
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    return { error: true, message: "Server error" };
   }
 };
 
@@ -68,34 +110,6 @@ const verifyOTP = async (req, res) => {
 };
 
 /**
- * Register after verify Email
- * @returns {string}
- */
-
-const register = async (req, res) => {
-  const { firstName, lastName, email, password } = req.body;
-  try {
-    const user = await User.findOne({ email });
-
-    if (!user || !user.isEmailVerified) {
-      res.status(400).json({ message: "Email not verified" });
-      return;
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    await User.updateOne(
-      { email },
-      { firstName: firstName, lastName: lastName, password: hashedPassword }
-    );
-
-    res.status(200).json({ message: "User registered successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-/**
  * Login method
  * @returns {string}
  */
@@ -119,4 +133,4 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { generateOTP, verifyOTP, register, login };
+module.exports = { verifyOTP, register, login };
