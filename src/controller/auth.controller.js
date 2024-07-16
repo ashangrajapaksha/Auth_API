@@ -11,7 +11,6 @@ const OTP_EXPIRATION_TIME = 60 * 1000;
  */
 const register = async (req, res) => {
   const { firstName, lastName, email, password } = req.body;
-  console.log(req.body);
   try {
     const user = await User.findOne({ email });
 
@@ -30,7 +29,7 @@ const register = async (req, res) => {
 
     await newUser.save();
 
-    const otpResponse = await generateOTP(email);
+    const otpResponse = await generateOTPLocally(email);
 
     if (otpResponse.error) {
       return res.status(500).json({ message: "Error generating OTP" });
@@ -49,7 +48,8 @@ const register = async (req, res) => {
  * @param {string} email - Email of the user
  * @returns {object} - Response message
  */
-const generateOTP = async (email) => {
+const generateOTP = async (req, res) => {
+  const { email } = req.body;
   try {
     if (!email) {
       return { error: true, message: "Email is required" };
@@ -61,7 +61,30 @@ const generateOTP = async (email) => {
       otp,
       otpExpiration: expirationTime,
     };
+    console.log(updateData);
+    await User.updateOne({ email }, updateData, { upsert: true });
 
+    // await sendEmail(email, "Your OTP Code", `Your OTP is ${otp}`);
+
+    res.status(200).json({ error: false, message: "OTP sent successfully" });
+  } catch (error) {
+    res.status(500).json({ error: true, message: "Server error" });
+  }
+};
+
+const generateOTPLocally = async (email) => {
+  try {
+    if (!email) {
+      return { error: true, message: "Email is required" };
+    }
+
+    const otp = generateNumericOTP(6);
+    const expirationTime = Date.now() + OTP_EXPIRATION_TIME;
+    const updateData = {
+      otp,
+      otpExpiration: expirationTime,
+    };
+    console.log(updateData);
     await User.updateOne({ email }, updateData, { upsert: true });
 
     // await sendEmail(email, "Your OTP Code", `Your OTP is ${otp}`);
@@ -133,4 +156,4 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { verifyOTP, register, login };
+module.exports = { verifyOTP, generateOTP, register, login };
